@@ -108,6 +108,29 @@
       // 松开时发 'p' 停止
       sendChar('p');
     }
+	
+	  // —— 新增：Telemetry 轮询 ——  
+    async function fetchTelemetry() {
+      try {
+        const res = await fetch('/api/telemetry');
+        const tele = await res.json();
+        if (tele.bat_v != null) {
+          const pct = Math.min(Math.max((tele.bat_v - 5.5) / 2, 0), 1);
+          document.getElementById('bat-fill').style.width = `${(pct*100).toFixed(1)}%`;
+          document.getElementById('bat-status').textContent = `${(pct*100).toFixed(1)}%`;
+        }
+        if (tele.speed != null) {
+          const speed = tele.speed;
+          document.getElementById('status').textContent = speed;
+          const spPct = Math.min(Math.max(speed / 300, 0), 1);
+          document.getElementById('speed-fill').style.width = `${(spPct*100).toFixed(1)}%`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    // 每 200ms 拉一次
+    setInterval(fetchTelemetry, 200);
   </script>
 
 </body>
