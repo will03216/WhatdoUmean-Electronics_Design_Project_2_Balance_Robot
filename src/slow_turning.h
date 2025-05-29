@@ -1,7 +1,9 @@
 // 继续调或者不要outerloop(就可以用更稳定的balance,还是说都可以用？) //p should be close to 0
 //correct speedCmPerSecond; deg to speed; stop turning ocasionally; why chrono works and micros() doesn't
+// tune yawPid or use yaw to turn //turning can't be about its centre axis because of contradiction
 
-// tune yawPid or use yaw to turn
+//gyro.y has offset? very small
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -61,7 +63,7 @@ float rotationalSpeedRadPerSecond = 0.0;
 bool motorsEnabled = true;
 
 bool isTurning = false;
-float turnSetpoint = 0.0;
+float turnVal = 0.0;
 
 float yawCorrection = 0;
 
@@ -132,10 +134,12 @@ void loop() {
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
-    float pitch = atan2(a.acceleration.z, a.acceleration.x ) - 0.01;//- 1.2*PI/180; //could add bias
+    float pitch = atan2(a.acceleration.z, a.acceleration.x ) - 0.02;//- 1.2*PI/180; //could add bias
     //delay(300);
-    float gyroPitchRate = g.gyro.y; //
-    //Serial.println(g.gyro.z);
+    float gyroPitchRate = g.gyro.y; 
+    //Serial.print("g.gyro.y: ");
+    //Serial.println(g.gyro.y);
+  
     float dt = LOOP_INTERVAL / 1000.0;
 
     filteredAngle = (1 - alpha) * pitch + alpha * (gyroPitchRate * dt + previousFilteredAngle);
@@ -174,32 +178,32 @@ void loop() {
     if (cmd == 'p') {
       vDesired = 0; // stop speed command
       isTurning = 0;
-      turnSetpoint = 0;         // stop any turning
-      Serial.println("STOP command received");
+      turnVal = 0;         // stop any turning
+      //Serial.println("STOP command received");
     }
     if (cmd == 'w') {
-      vDesired = 30; 
+      vDesired = 30; //adjust!!!
       isTurning = 0;
-      turnSetpoint = 0;         
-      Serial.println("FORWARD command received");
+      turnVal = 0;         
+      //Serial.println("FORWARD command received");
     }
     if (cmd == 's') {
-      vDesired = -30; 
+      vDesired = -30; //adjust!!!
       isTurning = 0;
-      turnSetpoint = 0;         
-      Serial.println("BACKWARD command received");
+      turnVal = 0;         
+      //Serial.println("BACKWARD command received");
     }
     if (cmd == 'a') {
-      vDesired = 30; 
+      vDesired = 0; 
       isTurning = 1;
-      turnSetpoint = 0.4;  //adjust       
-      Serial.println("LEFT command received");
+      turnVal = 1.4;  //adjust!!!       
+      //Serial.println("LEFT command received");
     }
     if (cmd == 'd') {
-      vDesired = 30; 
+      vDesired = 0; 
       isTurning = 1;
-      turnSetpoint = -0.4; //adjust        
-      Serial.println("BACKWARD command received");
+      turnVal = -1.4; //adjust!!!        
+      //Serial.println("BACKWARD command received");
     }
 
     }
@@ -219,7 +223,7 @@ void loop() {
        targetPitch = (speedOutput + 100) * 0.0006;
     } // adjust*/
 
-    double targetPitch = speedOutput * 0.00038; // adjust
+    double targetPitch = speedOutput * 0.00045; // adjust!!!
     //targetPitch = -0.05; //skip pid
     balancePid.setSetpoint(targetPitch); // targetPitch is in rad. make targetPitch + 0.2rad or -0.2rad (let vDesired=1)
     //balancePid.setSetpoint(0);
@@ -254,15 +258,17 @@ void loop() {
     //}
 
     
-    step1.setAccelerationRad(-balanceOutput - turnSetpoint + yawCorrection);
-    step2.setAccelerationRad(balanceOutput - turnSetpoint + yawCorrection);
+    step1.setAccelerationRad(-balanceOutput - turnVal + yawCorrection);
+    step2.setAccelerationRad(balanceOutput - turnVal + yawCorrection); //adjust
+    //Serial.print("turnVal: ");
+    //Serial.println(turnVal);
 
     Serial.print("speedCmPerSecond: ");
     Serial.println(speedCmPerSecond);
 
     
       if (balanceOutput > 0) { 
-      step1.setTargetSpeedRad (-30); // proportional to vDesired(set as a constant for initialisation)
+      step1.setTargetSpeedRad (-30); //10-30 //adjust!!! //proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
       step2.setTargetSpeedRad(30);
     } else {
       step1.setTargetSpeedRad(30);

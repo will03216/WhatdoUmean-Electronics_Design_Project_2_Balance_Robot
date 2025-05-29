@@ -35,7 +35,7 @@ void PID::isYawFn(bool yn) {
 float PID::compute(float input) {
     float currentTime = duration<float>(system_clock::now().time_since_epoch()).count();
     float dt = currentTime - lastTime;
-    if (dt <= 0.0) dt = 1e-3;
+    // if (dt <= 0.0) dt = 1e-3;
 
     float error = setpoint - input;
     if (isYaw) {
