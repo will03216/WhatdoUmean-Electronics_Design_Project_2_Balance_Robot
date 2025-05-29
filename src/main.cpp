@@ -60,7 +60,7 @@ float rotationalSpeedRadPerSecond = 0.0;
 // const float deadBand = 1;
 bool motorsEnabled = true;
 
-bool isTurning = false;
+
 float turnVal = 0.0;
 
 float yawCorrection = 0;
@@ -113,6 +113,7 @@ void setup() {
   SPI.begin(ADC_SCK_PIN, ADC_MISO_PIN, ADC_MOSI_PIN, ADC_CS_PIN);*/
 
   yawPid.isYawFn(true);
+  
 
 }
 
@@ -173,31 +174,26 @@ void loop() {
       char cmd = Serial.read();
     if (cmd == 'p') {
       vDesired = 0; // stop speed command
-      isTurning = 0;
       turnVal = 0;         // stop any turning
       Serial.println("STOP command received");
     }
     if (cmd == 'w') {
-      vDesired = 30; 
-      isTurning = 0;
+      vDesired = 10*wheelDiameter/2; 
       turnVal = 0;         
       Serial.println("FORWARD command received");
     }
     if (cmd == 's') {
-      vDesired = -30; 
-      isTurning = 0;
+      vDesired = -10*wheelDiameter/2; 
       turnVal = 0;         
       Serial.println("BACKWARD command received");
     }
     if (cmd == 'a') {
       vDesired = 0; 
-      isTurning = 1;
       turnVal = 0.7;  //adjust       
       Serial.println("LEFT command received");
     }
     if (cmd == 'd') {
       vDesired = 0; 
-      isTurning = 1;
       turnVal = -0.7; //adjust        
       Serial.println("BACKWARD command received");
     }
@@ -239,10 +235,10 @@ void loop() {
     Serial.print("balance: ");
     Serial.println(balanceOutput);
  
-    if(!isTurning){ 
+    if(turnVal==0){ 
       yawCorrection = yawPid.compute(rotationalSpeedRadPerSecond);
     }
-    else{
+    else if(turnVal!=0){
       yawCorrection = 0;
     }
 
@@ -253,22 +249,35 @@ void loop() {
       //balanceOutput = copysign(dbcompensation, balanceOutput);
     //}
 
+    if(turnVal==0){
+      step1.setAccelerationRad(-1.2*balanceOutput + yawCorrection);
+      step2.setAccelerationRad(1.2*balanceOutput + yawCorrection);
+    }
+    else if(turnVal>0){
+      step1.setAccelerationRad(-1.2*balanceOutput - turnVal);
+      step2.setAccelerationRad(1.2*balanceOutput);
+    }
+    else if(turnVal<0){
+      step2.setAccelerationRad(1.2*balanceOutput - turnVal); //adjust
+      step1.setAccelerationRad(-1.2*balanceOutput);
+    }
     
-    step1.setAccelerationRad(-balanceOutput - turnVal + yawCorrection);
-    step2.setAccelerationRad(balanceOutput - turnVal + yawCorrection); //adjuyst
-    Serial.print("turnVal: ");
-    Serial.println(turnVal);
+    //Serial.print("turnVal: ");
+    //Serial.println(turnVal);
+    
 
     Serial.print("speedCmPerSecond: ");
     Serial.println(speedCmPerSecond);
 
     
+      
+    
       if (balanceOutput > 0) { 
-      step1.setTargetSpeedRad (-30); // proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
-      step2.setTargetSpeedRad(30);
+      step1.setTargetSpeedRad (-10); // proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
+      step2.setTargetSpeedRad(10);
     } else {
-      step1.setTargetSpeedRad(30);
-      step2.setTargetSpeedRad(-30);
+      step1.setTargetSpeedRad(10);
+      step2.setTargetSpeedRad(-10);
     }
     
     
