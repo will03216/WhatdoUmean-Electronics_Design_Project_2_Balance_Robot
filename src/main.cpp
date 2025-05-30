@@ -2,6 +2,7 @@
 //correct speedCmPerSecond; deg to speed; stop turning ocasionally; why chrono works and micros() doesn't
 
 // tune yawPid or use yaw to turn
+// improve turning
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -254,10 +255,10 @@ void loop() {
     //}
 
     
-    step1.setAccelerationRad(balanceOutput + turnVal + yawCorrection);
-    step2.setAccelerationRad(balanceOutput - turnVal + yawCorrection); //adjuyst
-    Serial.print("turnVal: ");
-    Serial.println(turnVal);
+    step1.setAccelerationRad(balanceOutput + turnVal - 10*yawCorrection);
+    step2.setAccelerationRad(balanceOutput - turnVal + 10*yawCorrection); //adjuyst
+    Serial.print("yawCorrection: ");
+    Serial.println(yawCorrection);
 
     Serial.print("speedCmPerSecond: ");
     Serial.println(speedCmPerSecond);
