@@ -255,7 +255,7 @@ void loop() {
 
     
     step1.setAccelerationRad(balanceOutput + turnVal + yawCorrection);
-    step2.setAccelerationRad(balanceOutput - turnVal + yawCorrection); //adjuyst
+    step2.setAccelerationRad(balanceOutput - turnVal + yawCorrection); //adjust
     Serial.print("turnVal: ");
     Serial.println(turnVal);
 

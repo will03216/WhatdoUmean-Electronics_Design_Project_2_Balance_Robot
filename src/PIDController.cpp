@@ -8,9 +8,7 @@ using namespace std::chrono;
 PID::PID(float kp, float ki, float kd, float setpoint)
     : kp(kp), ki(ki), kd(kd), setpoint(setpoint),
       outputMin(-120.0), outputMax(120.0), //adjust
-      prevError(0.0), integral(0.0),
-      //sampleTime(0.01), 
-      isYaw(false)
+      prevError(0.0), integral(0.0), isYaw(false)
 {
     lastTime = duration<float>(system_clock::now().time_since_epoch()).count();
 }
@@ -35,7 +33,6 @@ void PID::isYawFn(bool yn) {
 float PID::compute(float input) {
     float currentTime = duration<float>(system_clock::now().time_since_epoch()).count();
     float dt = currentTime - lastTime;
-    // if (dt <= 0.0) dt = 1e-3;
 
     float error = setpoint - input;
     if (isYaw) {
