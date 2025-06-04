@@ -8,8 +8,20 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-6">
-  <!-- 标题 -->
-  <h1 class="text-5xl font-extrabold mb-12">Robot Control Dashboard</h1>
+	<!-- 标题 -->
+	<h1
+		class="
+		text-6xl font-extrabold 
+		bg-gradient-to-r from-green-400 via-blue-500 to-purple-600
+		text-transparent bg-clip-text
+		drop-shadow-2xl
+		transform hover:scale-105
+		transition-transform duration-300
+		mb-12
+		"
+	>
+		Robot Control Dashboard
+	</h1>
 
   <!-- 控制区卡片：使用命名网格区域，方便调整按钮位置 -->
   <section class="bg-gray-800 rounded-2xl shadow-lg p-6 mb-12"
@@ -33,7 +45,7 @@
   </section>
 
   <!-- 遥测区卡片 -->
-  <section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl flex flex-col sm:flex-row justify-between items-center gap-6">
+  <section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
     <!-- 电池进度（百分比在上，进度条在下） -->
     <div class="flex-1 w-full">
       <p class="mb-2 text-sm font-medium text-center">Battery</p>
@@ -50,7 +62,26 @@
         <div id="speed-fill" class="h-full bg-blue-500 w-0 transition-all"></div>
       </div>
     </div>
-  </section>
+</section>
+<div class="bg-gray-800 w-full max-w-xl mx-auto shadow-lg p-6 flex flex-col items-center">
+	<h2 class="text-4xl font-extrabold bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 text-transparent bg-clip-text drop-shadow-md mb-2">
+		AI-Driven Voice Control
+	</h2>
+	<p class="flex items-center gap-2 text-gray-400">
+		Supercharged by
+		<img src="https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg"
+			alt="ChatGPT" class="h-6 w-6 animate-pulse"/>
+	</p>
+</div>
+  <!-- 语音交互区 -->
+<section class="bg-gray-800 w-full max-w-xl mx-auto rounded-b-2xl shadow-lg p-6 flex flex-col items-center gap-4">
+	<button id="voice-btn"
+			class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">
+		Press to Speak
+	</button>
+	<p id="voice-status" class="text-sm text-gray-300">Not Recording</p>
+	<p id="chat-response" class="mt-4 text-white text-center text-lg"></p>
+</section>
 
   <script>
     // —— Control Logic，只发送单字符命令 ——  
@@ -131,6 +162,89 @@
     }
     // 每 200ms 拉一次
     setInterval(fetchTelemetry, 200);
+
+	// —— 全局缓存的 MediaStream，只请求一次麦克风权限 —— 
+	let micStream = null;
+	async function ensureMicAccess() {
+		if (micStream) return micStream;
+		micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		return micStream;
+	}
+	// —— 新增：语音交互相关 ——  
+  	const VOICE_API = '/api/voice';
+
+	// 录音相关变量
+	let mediaRecorder = null;
+	let audioChunks = [];
+
+	const voiceBtn = document.getElementById('voice-btn');
+	const voiceStatus = document.getElementById('voice-status');
+	const chatResponse = document.getElementById('chat-response');
+
+  	// 按住开始录音
+  	voiceBtn.addEventListener('mousedown', async () => {
+    // 清空上次记录的片段
+    audioChunks = [];
+    let stream;
+    try {
+      	// 仅在第一次时弹出权限框
+      	stream = await ensureMicAccess();
+    } catch (err) {
+      	console.error('NO ACCESS to MICROPHONE', err);
+      	voiceStatus.textContent = 'PLEASE ALLOW MICROPHONE ACCESS';
+      	return;
+    }
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.start();
+    voiceStatus.textContent = 'Recording...';
+
+    mediaRecorder.ondataavailable = (e) => {
+      	audioChunks.push(e.data);
+    };
+  });
+
+  // 松开结束录音，并发送到后端
+	voiceBtn.addEventListener('mouseup', () => {
+		if (!mediaRecorder) return;
+		mediaRecorder.stop();
+		voiceStatus.textContent = 'Uploading...';
+
+    mediaRecorder.onstop = async () => {
+		// 把录到的音频片段合成一个 Blob
+		const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+		// 通过 fetch 以 multipart/form-data 上传到后端
+		const formData = new FormData();
+		formData.append('audio', audioBlob, 'voice.webm');
+
+		try {
+			const res = await fetch(VOICE_API, {
+				method: 'POST',
+				body: formData,
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			// data: { transcription: "...", response: "..." }
+			voiceStatus.textContent = 'Recording complete';
+			chatResponse.textContent = data.response;
+			// 用浏览器的 TTS 把 GPT 回答朗读
+			if ('speechSynthesis' in window) {
+				const utter = new SpeechSynthesisUtterance(data.response);
+				window.speechSynthesis.speak(utter);
+			}
+		} catch (err) {
+			console.error(err);
+			voiceStatus.textContent = 'Recording failed';
+		}
+    };
+  });
+
+  	// 防止离开按钮区域时录音卡死
+  	voiceBtn.addEventListener('mouseleave', () => {
+    	if (mediaRecorder && mediaRecorder.state === 'recording') {
+      		mediaRecorder.stop();
+      	voiceStatus.textContent = 'Recording stopped';
+    }
+  });
   </script>
 
 </body>
