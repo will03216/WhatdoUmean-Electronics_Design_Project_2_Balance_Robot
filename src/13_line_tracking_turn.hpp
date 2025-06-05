@@ -4,6 +4,8 @@
 
 //gyro.y has offset? very small
 
+//black line:back. left wheel:step1. back tilted:b+, step1.setTargetSpeedRad (-), step2.setTargetSpeedRad (+).
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -19,6 +21,12 @@
 #define STEPPER2_STEP_PIN 14
 #define STEPPER_EN_PIN    15
 #define TOGGLE_PIN        32
+
+//ADC pins
+const int ADC_CS_PIN        = 5;
+const int ADC_SCK_PIN       = 18;
+const int ADC_MISO_PIN      = 19;
+const int ADC_MOSI_PIN      = 23;
 
 // === CONSTANTS ===
 const int PRINT_INTERVAL = 500;
@@ -67,7 +75,9 @@ float turnVal = 0.0;
 
 float yawCorrection = 0;
 
-
+bool lten = 1;
+const int lineSensorLeftPin = 35;   
+const int lineSensorRightPin = 34;  
 
 // static unsigned long startTime = millis(); // for testing
 
@@ -80,6 +90,22 @@ bool IRAM_ATTR TimerHandler(void *timerNo) {
   toggle = !toggle;
   return true;
 }
+
+// uint16_t readADC(uint8_t channel) {
+//   uint8_t tx0 = 0x06 | (channel >> 2);  // Command Byte 0 = Start bit + single-ended mode + MSB of channel
+//   uint8_t tx1 = (channel & 0x03) << 6;  // Command Byte 1 = Remaining 2 bits of channel
+
+//   digitalWrite(ADC_CS_PIN, LOW); 
+
+//   SPI.transfer(tx0);                    // Send Command Byte 0
+//   uint8_t rx0 = SPI.transfer(tx1);      // Send Command Byte 1 and receive high byte of result
+//   uint8_t rx1 = SPI.transfer(0x00);     // Send dummy byte and receive low byte of result
+
+//   digitalWrite(ADC_CS_PIN, HIGH); 
+
+//   uint16_t result = ((rx0 & 0x0F) << 8) | rx1; // Combine high and low byte into 12-bit result
+//   return result;
+// }
 
 // === SETUP ===
 void setup() {
@@ -115,6 +141,10 @@ void setup() {
   SPI.begin(ADC_SCK_PIN, ADC_MISO_PIN, ADC_MOSI_PIN, ADC_CS_PIN);*/
 
   yawPid.isYawFn(true);
+
+  //line tracking
+  pinMode(lineSensorLeftPin, INPUT);
+  pinMode(lineSensorRightPin, INPUT);
 
 }
 
@@ -157,6 +187,8 @@ void loop() {
     float distancePerStep = wheelCircumference / stepsPerRevolution;
     speedCmPerSecond = avgSpeed * distancePerStep;
 
+    //check chatgpt
+    //needs test!!!!!
     speedCmPerSecond1 = emaSpeed1 * distancePerStep;
     speedCmPerSecond2 = emaSpeed2 * distancePerStep;
     rotationalSpeedRadPerSecond = (speedCmPerSecond1 + speedCmPerSecond2) / trackWidth;
@@ -173,45 +205,74 @@ void loop() {
     //} // for testing
 
 
+    
+    //===cmd control===
     if (Serial.available() > 0) {
       char cmd = Serial.read();
     if (cmd == 'p') {
       vDesired = 0; // stop speed command
-      isTurning = 0;
       turnVal = 0;         // stop any turning
-      //Serial.println("STOP command received");
+      Serial.println("STOP command received");
     }
     if (cmd == 'w') {
-      vDesired = 30; //adjust!!!
-      isTurning = 0;
+      vDesired = 10*wheelDiameter/2; //30*wheelDiameter/2
       turnVal = 0;         
-      //Serial.println("FORWARD command received");
+      Serial.println("FORWARD command received");
     }
     if (cmd == 's') {
-      vDesired = -30; //adjust!!!
-      isTurning = 0;
+      vDesired = -10*wheelDiameter/2; //-30*wheelDiameter/2
       turnVal = 0;         
-      //Serial.println("BACKWARD command received");
+      Serial.println("BACKWARD command received");
     }
     if (cmd == 'a') {
       vDesired = 0; 
-      isTurning = 1;
-      turnVal = 1.4;  //adjust!!!       
-      //Serial.println("LEFT command received");
+      turnVal = 0.7;  //adjust!!!       
+      Serial.println("LEFT command received");
     }
     if (cmd == 'd') {
       vDesired = 0; 
-      isTurning = 1;
-      turnVal = -1.4; //adjust!!!        
-      //Serial.println("BACKWARD command received");
+      turnVal = -0.7; //adjust!!!      
+      Serial.println("BACKWARD command received");
     }
 
+    }
+
+
+    // === line tracking control ===
+    if(lten==1){
+    bool leftLineValue = digitalRead(lineSensorLeftPin);
+    bool rightLineValue = digitalRead(lineSensorRightPin);
+    Serial.print(leftLineValue);
+    Serial.print(" ");
+    Serial.println(rightLineValue);
+
+    //black=1
+    if (leftLineValue == 1 && rightLineValue == 0) {
+       // right turn
+       vDesired = 0;
+       turnVal = -13;  
+    }
+    else if (leftLineValue == 0 && rightLineValue == 1) {
+        // left turn
+        vDesired = 0;
+        turnVal = 13;
+    }
+    else if (leftLineValue == 0 && rightLineValue == 0) {
+        // 两侧都黄 → 停止或稍作后退
+        vDesired = 3;
+        turnVal = 0;    
+    }
+    else if (leftLineValue == 1 && rightLineValue == 1){
+        // advance
+        vDesired = 4; //to 22
+        turnVal = 0;
+    }
     }
     
     speedPid.setSetpoint(vDesired);
     float speedOutput = speedPid.compute(speedCmPerSecond) ; 
-    Serial.print("speedOutput: ");
-    Serial.println(speedOutput);
+    //Serial.print("speedOutput: ");
+    //Serial.println(speedOutput);
 
     
 
@@ -236,12 +297,12 @@ void loop() {
     //Serial.print("targetPitch: ");
     //Serial.println(targetPitch);
 
-    Serial.print("filteredAngle: ");
-    Serial.println(filteredAngle);
+    //Serial.print("filteredAngle: ");
+    //Serial.println(filteredAngle);
 
     float balanceOutput = balancePid.compute(filteredAngle) ;
-    Serial.print("balance: ");
-    Serial.println(balanceOutput);
+    //Serial.print("balance: ");
+    //Serial.println(balanceOutput);
  
     if(!isTurning){ 
       yawCorrection = yawPid.compute(rotationalSpeedRadPerSecond);
@@ -263,17 +324,45 @@ void loop() {
     //Serial.print("turnVal: ");
     //Serial.println(turnVal);
 
-    Serial.print("speedCmPerSecond: ");
-    Serial.println(speedCmPerSecond);
+    //Serial.print("speedCmPerSecond: ");
+    //Serial.println(speedCmPerSecond);
 
     
+    if (!vDesired && !turnVal){ //initiate,p
       if (balanceOutput > 0) { 
-      step1.setTargetSpeedRad (-30); //10-30 //adjust!!! //proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
+      step1.setTargetSpeedRad (-30); // proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
+      step2.setTargetSpeedRad(30);
+    } else {
+      step1.setTargetSpeedRad(10);
+      step2.setTargetSpeedRad(-10);
+    }
+    }
+    else if (turnVal){ //a,d
+      if (balanceOutput > 0) { 
+      step1.setTargetSpeedRad (-10); // proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
+      step2.setTargetSpeedRad(10);
+    } else {
+      step1.setTargetSpeedRad(10);
+      step2.setTargetSpeedRad(-10);
+    }
+    }
+    else if (!turnVal){ //w,s
+      if (balanceOutput > 0) { 
+      step1.setTargetSpeedRad (-30); // proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
       step2.setTargetSpeedRad(30);
     } else {
       step1.setTargetSpeedRad(30);
       step2.setTargetSpeedRad(-30);
     }
+    }
+    
+      /*if (balanceOutput > 0) { 
+      step1.setTargetSpeedRad (-30); //10-30 //adjust!!! //proportional to vDesired(set as a constant for initialisation) and a set constant for vDesired=0
+      step2.setTargetSpeedRad(30);
+    } else {
+      step1.setTargetSpeedRad(30);
+      step2.setTargetSpeedRad(-30);
+    }*/
     
     
     

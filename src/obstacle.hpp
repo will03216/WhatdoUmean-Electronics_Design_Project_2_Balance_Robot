@@ -1,14 +1,14 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
-#include <Adafruit_MPU6050.h>
+
 #include <Adafruit_Sensor.h>
-#include <step.h>
-#include "PIDController.h" 
+
+
 
 // defines pins numbers
-const int trigPin = 27;
-const int echoPin = 26;
+const int trigPin = 33;
+const int echoPin = 25;
 // defines variables
 long duration;
 int distance;
