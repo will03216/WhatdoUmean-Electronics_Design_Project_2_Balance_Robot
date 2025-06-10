@@ -24,15 +24,15 @@
 	</h1>
 
   <!-- 控制区卡片：使用命名网格区域，方便调整按钮位置 -->
-  <section class="bg-gray-800 rounded-2xl shadow-lg p-6 mb-12"
-           style="
-             display: grid;
-             grid-template-columns: repeat(3, 80px);
-             grid-template-rows: repeat(2, 80px);
-             grid-template-areas:
+<section class="bg-gray-800 rounded-2xl shadow-lg p-6 mb-12"
+        style="
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+        	grid-template-rows: repeat(2, 80px);
+            grid-template-areas:
                '. up .'
                'left down right';
-             gap: 1rem;
+            gap: 1rem;
            ">
     <button id="btn-w" class="btn-control bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-2xl"
             style="grid-area: up;">↑</button>
@@ -42,26 +42,26 @@
             style="grid-area: down;">↓</button>
     <button id="btn-d" class="btn-control bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-2xl"
             style="grid-area: right;">→</button>
-  </section>
+</section>
 
-  <!-- 遥测区卡片 -->
-  <section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
-    <!-- 电池进度（百分比在上，进度条在下） -->
-    <div class="flex-1 w-full">
-      <p class="mb-2 text-sm font-medium text-center">Battery</p>
-      <p id="bat-status" class="mb-2 text-center text-xl font-semibold">--%</p>
-      <div class="w-full bg-gray-700 rounded-lg overflow-hidden h-4">
-        <div id="bat-fill" class="h-full bg-green-500 w-0 transition-all"></div>
-      </div>
-    </div>
-    <!-- 速度文本及进度条 -->
-    <div class="flex-1 w-full">
-      <p class="mb-2 text-sm font-medium text-center">Speed</p>
-      <p id="status" class="text-xl font-semibold text-center mb-2">--</p>
-      <div class="w-full bg-gray-700 rounded-lg overflow-hidden h-4">
-        <div id="speed-fill" class="h-full bg-blue-500 w-0 transition-all"></div>
-      </div>
-    </div>
+	<!-- 遥测区卡片 -->
+<section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
+	<!-- 电池进度（百分比在上，进度条在下） -->
+	<div class="flex-1 w-full">
+	<p class="mb-2 text-sm font-medium text-center">Battery</p>
+	<p id="bat-status" class="mb-2 text-center text-xl font-semibold">--%</p>
+	<div class="w-full bg-gray-700 rounded-lg overflow-hidden h-4">
+		<div id="bat-fill" class="h-full bg-green-500 w-0 transition-all"></div>
+	</div>
+	</div>
+	<!-- 速度文本及进度条 -->
+	<div class="flex-1 w-full">
+	<p class="mb-2 text-sm font-medium text-center">Speed</p>
+	<p id="status" class="text-xl font-semibold text-center mb-2">--</p>
+	<div class="w-full bg-gray-700 rounded-lg overflow-hidden h-4">
+		<div id="speed-fill" class="h-full bg-blue-500 w-0 transition-all"></div>
+	</div>
+	</div>
 </section>
 <div class="bg-gray-800 w-full max-w-xl mx-auto shadow-lg p-6 flex flex-col items-center">
 	<h2 class="text-4xl font-extrabold bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 text-transparent bg-clip-text drop-shadow-md mb-2">
@@ -81,6 +81,15 @@
 	</button>
 	<p id="voice-status" class="text-sm text-gray-300">Not Recording</p>
 	<p id="chat-response" class="mt-4 text-white text-center text-lg"></p>
+</section>
+<!-- —— 新增：功能开关 —— -->
+<section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl mx-auto flex flex-col sm:flex-row justify-around items-center gap-4 mb-6">
+    <button id="btn-line" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">
+      Line Following: Off
+    </button>
+    <button id="btn-avoid" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">
+      Obstacle Avoidance: Off
+    </button>
 </section>
 
   <script>
@@ -247,7 +256,44 @@
       	voiceStatus.textContent = 'Recording stopped';
     }
   });
-  </script>
+
+	// // —— 功能开关相关 ——  
+	// const lineBtn  = document.getElementById('btn-line');
+	// const avoidBtn = document.getElementById('btn-avoid');
+	// let lineOn  = false;
+	// let avoidOn = false;
+
+	// lineBtn.addEventListener('click', () => {
+	// 	lineOn = !lineOn;
+	// 	// l 打开巡线, k 关闭
+	// 	sendChar(lineOn ? 'l' : 'k');
+	// 	lineBtn.textContent = `Line Following: ${lineOn ? 'On' : 'Off'}`;
+	// 	lineBtn.classList.toggle('bg-green-500', lineOn);
+	// 	lineBtn.classList.toggle('bg-red-600', !lineOn);
+	// });
+
+	// avoidBtn.addEventListener('click', () => {
+  	// 	avoidOn = !avoidOn;
+	// 	// o 打开避障, i 关闭
+	// 	sendChar(avoidOn ? 'o' : 'i');
+	// 	avoidBtn.textContent = `Obstacle Avoidance: ${avoidOn ? 'On' : 'Off'}`;
+	// 	avoidBtn.classList.toggle('bg-green-500', avoidOn);
+	// 	avoidBtn.classList.toggle('bg-red-600', !avoidOn);
+	// });
+	    // 功能开关
+    const lineBtn=document.getElementById('btn-line'), avoidBtn=document.getElementById('btn-avoid'); 
+	let lineOn=false, avoidOn=false;
+    lineBtn.addEventListener('click',()=>{ lineOn=!lineOn; sendChar(lineOn?'l':'k'); 
+		lineBtn.textContent=`Line Following: ${lineOn?'On':'Off'}`; 
+		lineBtn.classList.toggle('bg-green-500',lineOn); 
+		lineBtn.classList.toggle('bg-red-600',!lineOn); });
+    avoidBtn.addEventListener('click',()=>{ avoidOn=!avoidOn; sendChar(avoidOn?'o':'i'); 
+		avoidBtn.textContent=`Obstacle Avoidance: ${avoidOn?'On':'Off'}`; 
+		avoidBtn.classList.toggle('bg-green-500',avoidOn); 
+		avoidBtn.classList.toggle('bg-red-600',!avoidOn); });
+
+	
+</script>
 
 </body>
 </html>
