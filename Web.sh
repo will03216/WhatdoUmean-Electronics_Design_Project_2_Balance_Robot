@@ -1,0 +1,2 @@
+export openai_api_key="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"
+python3 Web_Backend.py

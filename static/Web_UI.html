@@ -4,11 +4,9 @@
   <meta charset="UTF-8"/>
   <title>Robot Control Web UI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-6">
-	<!-- 标题 -->
 	<h1
 		class="
 		text-6xl font-extrabold 
@@ -23,7 +21,7 @@
 		Robot Control Dashboard
 	</h1>
 
-  <!-- 控制区卡片：使用命名网格区域，方便调整按钮位置 -->
+  <!-- Control -->
 <section class="bg-gray-800 rounded-2xl shadow-lg p-6 mb-12"
         style="
             display: grid;
@@ -44,9 +42,8 @@
             style="grid-area: right;">→</button>
 </section>
 
-	<!-- 遥测区卡片 -->
 <section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
-	<!-- 电池进度（百分比在上，进度条在下） -->
+	<!-- Battery -->
 	<div class="flex-1 w-full">
 	<p class="mb-2 text-sm font-medium text-center">Battery</p>
 	<p id="bat-status" class="mb-2 text-center text-xl font-semibold">--%</p>
@@ -54,7 +51,7 @@
 		<div id="bat-fill" class="h-full bg-green-500 w-0 transition-all"></div>
 	</div>
 	</div>
-	<!-- 速度文本及进度条 -->
+	<!-- Speed -->
 	<div class="flex-1 w-full">
 	<p class="mb-2 text-sm font-medium text-center">Speed</p>
 	<p id="status" class="text-xl font-semibold text-center mb-2">--</p>
@@ -73,7 +70,7 @@
 			alt="ChatGPT" class="h-6 w-6 animate-pulse"/>
 	</p>
 </div>
-  <!-- 语音交互区 -->
+  <!-- Voice Control -->
 <section class="bg-gray-800 w-full max-w-xl mx-auto rounded-b-2xl shadow-lg p-6 flex flex-col items-center gap-4">
 	<button id="voice-btn"
 			class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">
@@ -82,7 +79,7 @@
 	<p id="voice-status" class="text-sm text-gray-300">Not Recording</p>
 	<p id="chat-response" class="mt-4 text-white text-center text-lg"></p>
 </section>
-<!-- —— 新增：功能开关 —— -->
+<!-- —— LF and OA —— -->
 <section class="bg-gray-800 rounded-2xl shadow-lg p-6 w-full max-w-xl mx-auto flex flex-col sm:flex-row justify-around items-center gap-4 mb-6">
     <button id="btn-line" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg">
       Line Following: Off
@@ -93,7 +90,7 @@
 </section>
 
   <script>
-    // —— Control Logic，只发送单字符命令 ——  
+    // —— Control Logic，Single Character ——  
     const held = new Set();
     const opposites = { w:'s', s:'w', a:'d', d:'a' };
 
@@ -106,7 +103,7 @@
     }
 
     function updateHold(k) {
-      // 按下时只发一次字符
+      // press and send Character once
       sendChar(k);
     }
 
@@ -145,11 +142,11 @@
       if (!held.has(k)) return;
       held.delete(k);
       document.getElementById('btn-'+k).classList.replace('bg-blue-500','bg-gray-700');
-      // 松开时发 'p' 停止
+      // release and send 'p'
       sendChar('p');
     }
 	
-	  // —— 新增：Telemetry 轮询 ——  
+	  // —— Telemetry Fetch ——  
     async function fetchTelemetry() {
       try {
         const res = await fetch('/api/telemetry');
@@ -169,34 +166,29 @@
         console.error(e);
       }
     }
-    // 每 200ms 拉一次
     setInterval(fetchTelemetry, 200);
 
-	// —— 全局缓存的 MediaStream，只请求一次麦克风权限 —— 
+	// Audio Recording and Voice Control
 	let micStream = null;
 	async function ensureMicAccess() {
 		if (micStream) return micStream;
 		micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 		return micStream;
 	}
-	// —— 新增：语音交互相关 ——  
   	const VOICE_API = '/api/voice';
-
-	// 录音相关变量
 	let mediaRecorder = null;
 	let audioChunks = [];
-
 	const voiceBtn = document.getElementById('voice-btn');
 	const voiceStatus = document.getElementById('voice-status');
 	const chatResponse = document.getElementById('chat-response');
-
-  	// 按住开始录音
+	
+  	// Hold to Record
   	voiceBtn.addEventListener('mousedown', async () => {
-    // 清空上次记录的片段
+    // Clear previous audio chunks
     audioChunks = [];
     let stream;
     try {
-      	// 仅在第一次时弹出权限框
+      	// pop up microphone access dialog
       	stream = await ensureMicAccess();
     } catch (err) {
       	console.error('NO ACCESS to MICROPHONE', err);
@@ -212,7 +204,7 @@
     };
   });
 
-  // 松开结束录音，并发送到后端
+  // Release to Stop and Send to backend
 	voiceBtn.addEventListener('mouseup', () => {
 		console.log("Mouse up, about to stop and send audio");
 		if (!mediaRecorder) return;
@@ -221,23 +213,18 @@
 		console.log("Recorder stopped, chunks:", audioChunks);
 
     mediaRecorder.onstop = async () => {
-		// 把录到的音频片段合成一个 Blob
 		const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-		// 通过 fetch 以 multipart/form-data 上传到后端
 		const formData = new FormData();
 		formData.append('audio', audioBlob, 'voice.webm');
 
 		try {
 			const res = await fetch(VOICE_API, {
-				method: 'POST',
-				body: formData,
-			});
+				method: 'POST', body: formData,});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
 			// data: { transcription: "...", response: "..." }
 			voiceStatus.textContent = 'Recording complete';
 			chatResponse.textContent = data.response;
-			// 用浏览器的 TTS 把 GPT 回答朗读
 			if ('speechSynthesis' in window) {
 				const utter = new SpeechSynthesisUtterance(data.response);
 				window.speechSynthesis.speak(utter);
@@ -249,7 +236,7 @@
     };
   });
 
-  	// 防止离开按钮区域时录音卡死
+  	// Avoid stopping on mouse leave and ensure recording stops
   	voiceBtn.addEventListener('mouseleave', () => {
     	if (mediaRecorder && mediaRecorder.state === 'recording') {
       		mediaRecorder.stop();
@@ -257,30 +244,7 @@
     }
   });
 
-	// // —— 功能开关相关 ——  
-	// const lineBtn  = document.getElementById('btn-line');
-	// const avoidBtn = document.getElementById('btn-avoid');
-	// let lineOn  = false;
-	// let avoidOn = false;
-
-	// lineBtn.addEventListener('click', () => {
-	// 	lineOn = !lineOn;
-	// 	// l 打开巡线, k 关闭
-	// 	sendChar(lineOn ? 'l' : 'k');
-	// 	lineBtn.textContent = `Line Following: ${lineOn ? 'On' : 'Off'}`;
-	// 	lineBtn.classList.toggle('bg-green-500', lineOn);
-	// 	lineBtn.classList.toggle('bg-red-600', !lineOn);
-	// });
-
-	// avoidBtn.addEventListener('click', () => {
-  	// 	avoidOn = !avoidOn;
-	// 	// o 打开避障, i 关闭
-	// 	sendChar(avoidOn ? 'o' : 'i');
-	// 	avoidBtn.textContent = `Obstacle Avoidance: ${avoidOn ? 'On' : 'Off'}`;
-	// 	avoidBtn.classList.toggle('bg-green-500', avoidOn);
-	// 	avoidBtn.classList.toggle('bg-red-600', !avoidOn);
-	// });
-	    // 功能开关
+    // —— Line Following and Obstacle Avoidance ——
     const lineBtn=document.getElementById('btn-line'), avoidBtn=document.getElementById('btn-avoid'); 
 	let lineOn=false, avoidOn=false;
     lineBtn.addEventListener('click',()=>{ lineOn=!lineOn; sendChar(lineOn?'l':'k'); 
@@ -292,7 +256,6 @@
 		avoidBtn.classList.toggle('bg-green-500',avoidOn); 
 		avoidBtn.classList.toggle('bg-red-600',!avoidOn); });
 
-	
 </script>
 
 </body>

@@ -1,0 +1,59 @@
+/* style.css */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body, html {
+  width: 100%;
+  height: 100%;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background: #f5f5f5;
+}
+
+/* Flex 居中容器 */
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+}
+
+/* 状态文本 */
+.status {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background 0.3s, color 0.3s;
+}
+.status.disconnected {
+  background: #ffecec;
+  color: #d8000c;
+}
+.status.connected {
+  background: #e6ffed;
+  color: #006400;
+}
+
+/* 按钮样式 */
+.btn {
+  font-size: 1.25rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn:disabled {
+  background: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+.btn.enabled {
+  background: #4caf50;
+  color: #fff;
+  box-shadow: 0 0 1rem rgba(76, 175, 80, 0.6);
+}
+.btn.enabled:hover {
+  transform: translateY(-2px);
+}

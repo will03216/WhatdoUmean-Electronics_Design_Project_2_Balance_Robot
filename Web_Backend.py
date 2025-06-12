@@ -105,33 +105,33 @@ def api_voice():
         print(f"[ERROR] GPT ChatCompletion 失败：{e}")
         return jsonify({'error': f'ChatCompletion 失败: {e}'}), 500
 	
-    # # 5. 解析 GPT 回复，提取命令字符和时长 发给 ESP32
-    # # 解析出命令字符和时长
-    # pairs = re.findall(r'([wasd])(\d+)', response_text)
-    # if not pairs:
-    #     print("[ERROR] 无法解析 GPT 输出")
-    #     return jsonify({'error': 'invalid command format'}), 400
+    # 5. 解析 GPT 回复，提取命令字符和时长 发给 ESP32
+    # 解析出命令字符和时长
+    pairs = re.findall(r'([wasd])(\d+)', response_text)
+    if not pairs:
+        print("[ERROR] 无法解析 GPT 输出")
+        return jsonify({'error': 'invalid command format'}), 400
     
-    # # 依次遍历每对 (cmd_char, dur_str)
-    # for cmd_char, dur_str in pairs:
-    #     dur = int(dur_str)
-    #     print(f"[DEBUG] 解析到命令 {cmd_char}，持续 {dur} 秒")
-    #     # 写入运动命令
-    #     try:
-    #         with open(FIFO, 'w') as fifo:
-    #             fifo.write(cmd_char)
-    #         print(f"[DEBUG] 写入 FIFO: {cmd_char}")
-    #     except Exception as e:
-    #         print(f"[ERROR] 写命令到 FIFO 失败：{e}")
-    #     # 等待对应时长
-    #     time.sleep(dur)
+    # 依次遍历每对 (cmd_char, dur_str)
+    for cmd_char, dur_str in pairs:
+        dur = int(dur_str)
+        print(f"[DEBUG] 解析到命令 {cmd_char}，持续 {dur} 秒")
+        # 写入运动命令
+        try:
+            with open(FIFO, 'w') as fifo:
+                fifo.write(cmd_char)
+            print(f"[DEBUG] 写入 FIFO: {cmd_char}")
+        except Exception as e:
+            print(f"[ERROR] 写命令到 FIFO 失败：{e}")
+        # 等待对应时长
+        time.sleep(dur)
 
-    # try:
-    #     with open(FIFO, 'w') as fifo:
-    #         fifo.write('p')
-    #     print("[DEBUG] 写入 FIFO: p (停止)")
-    # except Exception as e:
-    #     print(f"[ERROR] 写停止到 FIFO 失败：{e}")
+    try:
+        with open(FIFO, 'w') as fifo:
+            fifo.write('p')
+        print("[DEBUG] 写入 FIFO: p (停止)")
+    except Exception as e:
+        print(f"[ERROR] 写停止到 FIFO 失败：{e}")
 
     # 返回结果给前端
     print("[DEBUG] 即将返回 JSON 响应给客户端")    

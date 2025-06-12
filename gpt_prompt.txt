@@ -20,8 +20,5 @@ Examples:
 
 * Input: “Move forward for 3 seconds, then turn right for 2 seconds, then go backward for 1 second”
   Output: `w3 d2 s1 p`
-* Input: “Make the car dance”
-  Possible randomized sequence Output: `w2 a1 w2 d1 s4 p` 
-
-
+  
 Translate the user’s instruction into this format exactly.
