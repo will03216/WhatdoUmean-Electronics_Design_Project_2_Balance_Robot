@@ -6,9 +6,14 @@
 
 // black line:back. left wheel:step1. back tilted:b+, step1.setTargetSpeedRad (-), step2.setTargetSpeedRad (+).
 
+// 电池计时
 // PUSH
 // position control pid
-// turnpid(yawpid)
+// turnpid(用不用yawpid都行)，注意角度变化
+// ultra用loop、急停急始
+
+//stuck is probably because of timing in the third control logic
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TimerInterrupt_Generic.h>
@@ -75,7 +80,6 @@ bool isTurning = false;
 float turnVal = 0.0;
 
 float yawCorrection = 0;
-int angleDesired = 0;
 
 bool light_tracking_enable = 0;
 
@@ -92,13 +96,15 @@ bool obstacleDetected = false;
 
 bool autoTurn = false;
 unsigned long turnStartTime = 0;
-const unsigned long TURN_DURATION_MS = 3000;
+const unsigned long TURN_DURATION_MS = 4000;
 
-volatile unsigned long echoStart = 0;
-volatile unsigned long echoEnd = 0;
-volatile bool echoReceived = false;
-static unsigned long lastTriggerTime = 0;
-static float latestDistance = 0;
+unsigned long trigStartTime = 0;
+unsigned long echoStartTime = 0;
+unsigned long echoEndTime = 0;
+bool trigSent = false;
+bool waitingForEcho = false;
+float latestDistance = 0;
+
 
 // static unsigned long startTime = millis(); // for testing
 
@@ -113,18 +119,44 @@ bool IRAM_ATTR TimerHandler(void *timerNo)
   return true;
 }
 
-void IRAM_ATTR echoISR()
-{
-  if (digitalRead(ECHO_PIN) == HIGH)
-  {
-    echoStart = micros(); // Rising edge
+void updateUltrasonicDistance() {
+  static unsigned long echoTimeoutStart = 0;
+
+  if (!trigSent) {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    trigStartTime = micros();
+    trigSent = true;
+    waitingForEcho = true;
+    echoTimeoutStart = micros();
   }
-  else
-  {
-    echoEnd = micros();  // Falling edge
-    echoReceived = true; // Tell loop to process
+
+  if (waitingForEcho) {
+    if (digitalRead(ECHO_PIN) == HIGH) {
+      echoStartTime = micros();
+      while (digitalRead(ECHO_PIN) == HIGH) {
+        echoEndTime = micros();
+        if (echoEndTime - echoStartTime > 30000) break;  // Timeout after 30ms
+      }
+      long duration = echoEndTime - echoStartTime;
+      latestDistance = duration * 0.034 / 2.0;
+      trigSent = false;
+      waitingForEcho = false;
+    }
+  
+    // else still waiting for rising edge
+    //  else if (micros() - echoTimeoutStart > 35000) {
+    //   // Timeout waiting for echo to begin
+    //   latestDistance = 255;
+    //   trigSent = false;
+    //   waitingForEcho = false;
+    // }
   }
 }
+
 
 // uint16_t readADC(uint8_t channel) {
 //   uint8_t tx0 = 0x06 | (channel >> 2);  // Command Byte 0 = Start bit + single-ended mode + MSB of channel
@@ -202,7 +234,7 @@ void setup()
   // ultrasound
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(ECHO_PIN), echoISR, CHANGE);
+
 }
 
 // === LOOP ===
@@ -296,12 +328,6 @@ void loop()
         turnVal = -0.7; // adjust!!!
         Serial.println("BACKWARD command received");
       }
-      if (cmd == 'z'){
-        vDesired = 0;
-        turnVal = 0; 
-        angleDesired = 90;
-        Serial.println("90 left command received");
-      }
     }
 
     // === line tracking control ===
@@ -342,28 +368,9 @@ void loop()
 
     // ==obstacle avoiding==
 
-    if (millis() - lastTriggerTime > 100)
-    { // Trigger every 100ms
-      digitalWrite(TRIG_PIN, LOW);
-      delayMicroseconds(2);
-      digitalWrite(TRIG_PIN, HIGH);
-      delayMicroseconds(10);
-      digitalWrite(TRIG_PIN, LOW);
-      lastTriggerTime = millis();
-    }
-
-    if (echoReceived)
-    {
-      noInterrupts(); // prevent data races
-      unsigned long duration = echoEnd - echoStart;
-      echoReceived = false;
-      interrupts();
-
-      latestDistance = duration * 0.034 / 2.0; // cm
-      Serial.print("Distance: ");
-      Serial.println(latestDistance);
-    }
-
+    updateUltrasonicDistance();
+    float obstacleDistance = latestDistance;
+    Serial.println(obstacleDistance);
     // float obstacleDistance = getUltrasonicDistanceCM();
     if(obstacle_avoiding_enable){
       if (latestDistance < OBSTACLE_DISTANCE_THRESHOLD)
@@ -373,16 +380,16 @@ void loop()
       obstacleDetected = true;
       vDesired = 0;
       isTurning = true;
-      turnVal = 0.7;
+      turnVal = 2;
       turnStartTime = millis();
       Serial.println("Obstacle detected! Turn for 1s.");
 
       autoTurn = 1;
     }
-    else if (latestDistance >= OBSTACLE_DISTANCE_THRESHOLD) //stay still
+    else if (latestDistance >= OBSTACLE_DISTANCE_THRESHOLD) //move forward
     {
       obstacleDetected = false;
-      vDesired = 8;
+      vDesired = 9;
       isTurning = 0;
       turnVal = 0;
 
@@ -403,7 +410,7 @@ void loop()
        targetPitch = (speedOutput + 100) * 0.0006;
     } // adjust*/
 
-    float targetPitch = speedOutput * 0.00045; // adjust!!!
+    double targetPitch = speedOutput * 0.00045; // adjust!!!
     // targetPitch = -0.05; //skip pid
     balancePid.setSetpoint(targetPitch); // targetPitch is in rad. make targetPitch + 0.2rad or -0.2rad (let vDesired=1)
     // balancePid.setSetpoint(0);
@@ -420,11 +427,6 @@ void loop()
     // Serial.print("balance: ");
     // Serial.println(balanceOutput);
 
-    if(angleDesired != 0){
-      anglePid.setSetpoint(angleDesired);
-      float angleOutput = anglePid.compute(rotational);
-    }
-    
     if (!isTurning)
     {
       yawCorrection = yawPid.compute(rotationalSpeedRadPerSecond);
@@ -502,7 +504,7 @@ void loop()
   {
     
     obstacleDetected = false;
-    vDesired = 8;
+    vDesired = 9;
     isTurning = 0;
     turnVal = 0;
     //Serial.println("Turn finished. Moving forward.");

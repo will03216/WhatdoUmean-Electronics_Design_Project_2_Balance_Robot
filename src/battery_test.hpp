@@ -47,6 +47,8 @@ uint16_t readADC(uint8_t channel) {
 
 float read_current_sensor() {
     int raw = readADC(0); 
+    // Serial.print(readADC(0));
+    // Serial.println();
     float voltage = raw * (4.096 / 4095.0);  // Assuming 4.096V ADC, 12-bit (ESP32)
     
     float current_mA = (voltage / resistance) * 1000.0;  // R = 0.1Ω → convert to mA

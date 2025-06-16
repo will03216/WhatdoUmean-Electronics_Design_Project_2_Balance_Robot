@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "PIDController.h"
 #include <algorithm>
 #include <chrono> //for ioplatform 
@@ -7,7 +8,7 @@ using namespace std::chrono;
 
 PID::PID(float kp, float ki, float kd, float setpoint)
     : kp(kp), ki(ki), kd(kd), setpoint(setpoint),
-      outputMin(-120.0), outputMax(120.0), //adjust
+      outputMin(-70.0), outputMax(70.0), //adjust:150 could work
       prevError(0.0), integral(0.0), isYaw(false)
 {
     lastTime = duration<float>(system_clock::now().time_since_epoch()).count();
@@ -36,8 +37,8 @@ float PID::compute(float input) {
 
     float error = setpoint - input;
     if (isYaw) {
-        if (error > M_PI) error -= 2 * M_PI;
-        else if (error < -M_PI) error += 2 * M_PI;
+        if (error > PI) error -= 2 * PI;
+        else if (error < -PI) error += 2 * PI;
     }
 
     integral += error * dt;
