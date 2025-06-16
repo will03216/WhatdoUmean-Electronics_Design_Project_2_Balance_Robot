@@ -7,7 +7,7 @@ if not os.path.exists(FIFO_CMD):
 
 while True:
     with open(FIFO_CMD, 'r') as fifo:
-        for ch in fifo.read():  # 读单字符
+        for ch in fifo.read(): 
             if not ch:
                 continue
             print(ch)
