@@ -285,7 +285,7 @@ void loop()
         StaticJsonDocument<200> doc;
         JsonObject tele = doc.createNestedObject("tele");
         tele["bat_v"] = battery_percentage;
-        tele["speed"] = 10;
+        tele["speed"] = speedCmPerSecond;
 
         // 序列化并写入串口
         serializeJson(doc, Serial);
