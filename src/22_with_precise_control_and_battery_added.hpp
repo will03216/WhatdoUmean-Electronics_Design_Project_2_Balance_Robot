@@ -87,11 +87,26 @@ const int stepsPerRevolution = 200 * 16;
 float distancePerStep = wheelCircumference / stepsPerRevolution;
 const float trackWidth = 12.4;
 
+float pitch = 0.0;
+float gyroPitchRate = 0.0;
+float dt = 0.0;
+float rawSpeed1 = 0.0;
+float rawSpeed2 = 0.0;
+float avgSpeed = 0.0;
+float gyroYawRate = 0.0;
+
+float speedOutput = 0.0;
+float targetPitch = 0.0;
+float balanceOutput = 0.0;
+
 // precise turning
 bool preciseTurning = false;
 float targetYawAngle = 0;
 float yawAngle = 0.0;  // in radians
 float gyroXBias = 0.0; // adjust!!!
+
+float yawError = 0.0;
+float pidTurnOutput = 0.0;
 
 // precise moving
 float cumulativeDistance = 0.0; // cm
@@ -112,6 +127,8 @@ bool line_tracking_enable = 0;
 
 const int lineSensorLeftPin = 35;
 const int lineSensorRightPin = 34;
+bool leftLineValue = 0;
+bool rightLineValue = 0.0;
 
 // obstacle avoiding
 bool obstacle_avoiding_enable = 0;
@@ -144,7 +161,8 @@ unsigned long last_update_time = 0;
 const float logicSensingResistance = 0.01;
 const float motorSensingResistance = 0.1;
 // static unsigned long startTime = millis(); // for testing
-
+float logic_avg_current_mA = 0.0;
+float motor_avg_current_mA = 0.0;
 float battery_percentage = 0.0;
 
 
@@ -156,12 +174,14 @@ step step1(STEPPER_INTERVAL_US, STEPPER1_STEP_PIN, STEPPER1_DIR_PIN);
 step step2(STEPPER_INTERVAL_US, STEPPER2_STEP_PIN, STEPPER2_DIR_PIN);
 
 // speedpid could be larger!!!!
-PID balancePid(900.0, 0.0, 110.0, 0.0); // p enough or larger //500,0,130 turns maybe better //1200,0,130 //1000,0,130 //900,0,110 // a=30 //(remember the +-120 limits in PIDController.h) p should be large for fast reaction, i is replaced by bias, and a not too large d reduces oscillation //(900,0,50,0) //(9000, 5, 30, 0); //(9000, 17, 80, 0); //adjust
+PID balancePid(900.0, 0.0, 110.0, 0.0); // p enough or larger //500,0,130 turns maybe better //1500,0,130 //1200,0,130 //1000,0,130 //900,0,110 // a=30 //(remember the +-120 limits in PIDController.h) p should be large for fast reaction, i is replaced by bias, and a not too large d reduces oscillation //(900,0,50,0) //(9000, 5, 30, 0); //(9000, 17, 80, 0); //adjust
 PID speedPid(4.5, 0.0, 0.5, 0.0);       // 4.5 //3.5 falls once //(not a) 90  //2.2-2.6 // smaller p i d values //(3.6, 0, 0.9, 0) // (1.0, 0.38, 0.23, 0); //adjust 这里 以及 下面的2个
-PID positionPid(0.5, 0.0, 0.7, 0.0);    // 1,0.5,0.7 //6 //10,0,3 is wrong  // must have lowest bandwidth
-PID yawPid(2.9, 0.0, 0.0, 0.0);         // a=0.03
+PID positionPid(2.5, 0.03, 0.0, 0.0);    // 1,0.5,0.7 //6 //10,0,3 is wrong  // must have lowest bandwidth
+PID yawPid(4.0, 0.0, 0.0, 0.0);         // a=0.03
 // To improve turning exactly 90 degrees, you can add a dedicated turning PID controller that drives the robot's turnVal based on the error between the current yaw angle and a target yaw angle (e.g., ±π/2 radians = ±90°).
 PID turnPid(1.0, 0.0, 2.0, 0.0); // 1,0.13,4 //1,0,4// for mpu //1,0,2 works(h more accurate than f) //a=3 // (12.0, 0.0, 1.0, 0.0) // (14,0,0.2,0) //20,0,0.2 //30,0,20
+// PID linePid(3.0, 0.0, 1.5, 0.0); // tune these values
+
 
 // === ISR ===
 bool IRAM_ATTR TimerHandler(void *timerNo)
@@ -291,13 +311,14 @@ void setup()
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
-    for (int i = 0; i < 500; i++)
+    for (int i = 0; i < 50; i++)
     {
 
         gyroXBias += g.gyro.x;
-        delay(2);
+        // delay(2);
     }
-    gyroXBias /= 500.0;
+    gyroXBias /= 50;
+    Serial.println("gyroXBias found!");
 
     // getPosition() bias
 
@@ -328,25 +349,25 @@ void loop()
         sensors_event_t a, g, temp;
         mpu.getEvent(&a, &g, &temp);
 
-        float pitch = atan2(a.acceleration.z, a.acceleration.x) - 0.005; //- 1.2*PI/180; //could add bias
+        pitch = atan2(a.acceleration.z, a.acceleration.x) - 0.01;// + 0.01;// - 0.015; //- 1.2*PI/180; //could add bias
         // Serial.print(pitch);
         // Serial.println();
         // delay(300);
-        float gyroPitchRate = g.gyro.y;
+        gyroPitchRate = g.gyro.y;
         // Serial.print("g.gyro.y: ");
         // Serial.println(g.gyro.y);
 
-        float dt = LOOP_INTERVAL / 1000.0; // change from ms to s
+        dt = LOOP_INTERVAL / 1000.0; // change from ms to s
 
         filteredAngle = (1 - alpha) * pitch + alpha * (gyroPitchRate * dt + previousFilteredAngle);
         previousFilteredAngle = filteredAngle;
         // Serial.print(filteredAngle);
         // Serial.println();
 
-        float rawSpeed1 = step1.getSpeed() / 2000.0;
+        rawSpeed1 = step1.getSpeed() / 2000.0;
         // Serial.print("raw speed: ");
         // Serial.println(rawSpeed1);
-        float rawSpeed2 = step2.getSpeed() / 2000.0;
+        rawSpeed2 = step2.getSpeed() / 2000.0;
         // Serial.println(rawSpeed1);
 
         // Serial.print((rawSpeed1-rawSpeed2)/2); //steps per sec
@@ -355,7 +376,7 @@ void loop()
         emaSpeed1 = alphaEMA * rawSpeed1 + (1 - alphaEMA) * emaSpeed1;
         emaSpeed2 = alphaEMA * rawSpeed2 + (1 - alphaEMA) * emaSpeed2;
 
-        float avgSpeed = (emaSpeed1 - emaSpeed2) / 2.0;
+        avgSpeed = (emaSpeed1 - emaSpeed2) / 2.0;
         // Serial.print(avgSpeed);
         // Serial.print(" ");
 
@@ -511,7 +532,7 @@ void loop()
         // dt = (nowMicros - prevMicros) / 1e6; // convert to seconds
         // prevMicros = nowMicros;
 
-        float gyroYawRate = g.gyro.x - gyroXBias; // rad/s //ADJUST???
+        gyroYawRate = g.gyro.x - gyroXBias; // rad/s //ADJUST???
         // static float filteredYawRate = 0;
         // filteredYawRate = 0.9 * filteredYawRate + 0.1 * gyroYawRate;
         // yawAngle += filteredYawRate * dt;
@@ -533,9 +554,9 @@ void loop()
 
         if (preciseTurning)
         {
-            float yawError = targetYawAngle - yawAngle;
+            yawError = targetYawAngle - yawAngle;
             turnPid.setSetpoint(targetYawAngle);
-            float pidTurnOutput = turnPid.compute(yawAngle) * 0.4;
+            pidTurnOutput = turnPid.compute(yawAngle) * 0.4;
 
             // Limit the turn rate to safe bounds
             pidTurnOutput = constrain(pidTurnOutput, -3.0, 3.0);
@@ -558,8 +579,8 @@ void loop()
         // try precise turning
         if (line_tracking_enable)
         {
-            bool leftLineValue = digitalRead(lineSensorLeftPin);
-            bool rightLineValue = digitalRead(lineSensorRightPin);
+            leftLineValue = digitalRead(lineSensorLeftPin);
+            rightLineValue = digitalRead(lineSensorRightPin);
             // Serial.print(leftLineValue);
             // Serial.print(" ");
             // Serial.println(rightLineValue);
@@ -569,13 +590,13 @@ void loop()
             {
                 // right turn
                 vDesired = 0;
-                turnVal = -13;
+                turnVal = -3;
             }
             else if (leftLineValue == 0 && rightLineValue == 1)
             {
                 // left turn
                 vDesired = 0;
-                turnVal = 13;
+                turnVal = 3;
             }
             else if (leftLineValue == 0 && rightLineValue == 0)
             {
@@ -586,7 +607,7 @@ void loop()
             else if (leftLineValue == 1 && rightLineValue == 1)
             {
                 // advance
-                vDesired = 15; // 12 to 22 are acceptable
+                vDesired = 10; // 12 to 22 are fast enough
                 turnVal = 0;
             }
         }
@@ -648,7 +669,7 @@ void loop()
             float positionError = targetDistance - cumulativeDistance;
 
             // Stop within ±1 cm
-            if (abs(positionError) < 0.5) // adjust!!!!!!!
+            if (abs(positionError) < 0.6) // adjust!!!!!!!
             {
                 vDesired = 0; // no turning control
                 movingToTarget = false;
@@ -658,8 +679,8 @@ void loop()
             {
                 positionPid.setSetpoint(targetDistance);
                 vDesired = positionPid.compute(cumulativeDistance) * 0.5; // note bandwidth issue
-                // Serial.println();
-                // Serial.println(vDesired);
+                Serial.println();
+                Serial.println(vDesired);
                 // Clamp max speed
                 vDesired = constrain(vDesired, -70 * 0.5, 70 * 0.5); // cm/s //needless
             }
@@ -669,7 +690,7 @@ void loop()
         // Serial.println();
 
         speedPid.setSetpoint(vDesired);
-        float speedOutput = speedPid.compute(speedCmPerSecond);
+        speedOutput = speedPid.compute(speedCmPerSecond);
         // Serial.print(speedOutput);
         // Serial.println();
 
@@ -681,7 +702,7 @@ void loop()
            targetPitch = (speedOutput + 100) * 0.0006;
         } // adjust*/
 
-        float targetPitch = speedOutput * 0.00045; // adjust!!!
+        targetPitch = speedOutput * 0.00045; // adjust!!!
         // targetPitch = -0.05; //skip pid
         balancePid.setSetpoint(targetPitch); // targetPitch is in rad. make targetPitch + 0.2rad or -0.2rad (let vDesired=1)
         // balancePid.setSetpoint(0);
@@ -694,7 +715,7 @@ void loop()
         // Serial.print("filteredAngle: ");
         // Serial.println(filteredAngle);
 
-        float balanceOutput = balancePid.compute(filteredAngle);
+        balanceOutput = balancePid.compute(filteredAngle);
         // Serial.print("balance: ");
         // Serial.println(balanceOutput);
 
@@ -796,25 +817,25 @@ void loop()
     //     last_sample_time = now;
     // }
 
-    float logic_avg_current_mA = 0.0;
-    float motor_avg_current_mA = 0.0;
-    unsigned long now = millis();   
-    if (now - last_update_time >= AVERAGE_WINDOW_MS)
+    logic_avg_current_mA = 0.0;
+    motor_avg_current_mA = 0.0;
+      
+    if (millis() - last_update_time >= AVERAGE_WINDOW_MS)
     {
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 5; i++)
         {
             logic_avg_current_mA += read_logic_current_sensor();
         }
-        logic_avg_current_mA /= 20;
+        logic_avg_current_mA /= 5;
         // Serial.print("logic current: ");
         // Serial.println(logic_avg_current_mA);
         float logic_delta_charge_mAh = logic_avg_current_mA * (AVERAGE_WINDOW_MS / 3600000.0); // ms → h
 
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 5; i++)
         {
             motor_avg_current_mA += read_motor_current_sensor();
         }
-        motor_avg_current_mA /= 20;
+        motor_avg_current_mA /= 5;
         float motor_delta_charge_mAh = motor_avg_current_mA * (AVERAGE_WINDOW_MS / 3600000.0); // ms → h
 
         remaining_capacity_mAh = remaining_capacity_mAh - logic_delta_charge_mAh - motor_delta_charge_mAh;
@@ -828,7 +849,7 @@ void loop()
         // Serial.print(battery_percentage);
         // Serial.println("%");
 
-        last_update_time = now;
+        last_update_time = millis();
     }
 
     if (millis() > printTimer)
@@ -852,8 +873,8 @@ void loop()
         // Serial.print("motor current reading: (mA): ");
         // Serial.println(motor_avg_current_mA);
 
-        Serial.print("Battery: ");
-        Serial.print(battery_percentage);
-        Serial.println("%");
+        // Serial.print("Battery: ");
+        Serial.println(battery_percentage);
+        // Serial.println("%");
     }
 }
