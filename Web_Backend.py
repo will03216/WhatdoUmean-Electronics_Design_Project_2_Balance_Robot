@@ -111,7 +111,7 @@ def api_voice():
 
     for cmd_char, dur_str in pairs:
         dur = int(dur_str)
-        print(f"[DEBUG] Command {cmd_char} is detecte, for {dur} seconds")
+        print(f"[DEBUG] Command {cmd_char} is detected, for {dur} seconds")
         try:
             with open(FIFO, 'w') as fifo:
                 fifo.write(cmd_char)

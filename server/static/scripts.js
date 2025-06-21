@@ -1,7 +1,6 @@
 // script.js
 const statusEl = document.getElementById('status');
 const btn = document.getElementById('goBtn');
-// 目标重定向地址，按需修改：
 const targetUrl = 'https://whatdoumeanrobot.com:60001/Web_UI.html/';
 
 async function pollStatus() {
@@ -22,7 +21,6 @@ async function pollStatus() {
       btn.classList.remove('enabled');
     }
   } catch (err) {
-    // 出错也当作未连接处理
     statusEl.textContent = 'Not Connected';
     statusEl.classList.remove('connected');
     statusEl.classList.add('disconnected');
@@ -32,11 +30,9 @@ async function pollStatus() {
   }
 }
 
-// 初次执行一次，然后每秒轮询
 pollStatus();
 setInterval(pollStatus, 1000);
 
-// 只有在 enabled（已连接）状态下才跳转
 btn.addEventListener('click', () => {
   if (!btn.disabled) {
     window.location.href = targetUrl;

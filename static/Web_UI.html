@@ -88,6 +88,20 @@
       Obstacle Avoidance: Off
     </button>
 </section>
+<section class="bg-gray-800 rounded-2xl shadow-lg p-6 mb-12 flex justify-center gap-4">
+  <button id="btn-f"
+          class="btn-control bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-2xl">
+    F : Turn Left by 90 Degrees
+  </button>
+  <button id="btn-h"
+          class="btn-control bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-2xl">
+    H : Turn Right by 90 Degrees
+  </button>
+  <button id="btn-t"
+          class="btn-control bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-2xl">
+    T : Go Straight for 30 cm
+  </button>
+</section>
 
   <script>
     // —— Control Logic，Single Character ——  
@@ -107,7 +121,7 @@
       sendChar(k);
     }
 
-    ['w','a','s','d'].forEach(k => {
+    ['w','a','s','d','t','f','h'].forEach(k => {
       const btn = document.getElementById('btn-' + k);
       ['pointerdown','mousedown','touchstart'].forEach(evt =>
         btn.addEventListener(evt, e => { e.preventDefault(); hold(k); })
@@ -116,18 +130,22 @@
         btn.addEventListener(evt, e => { e.preventDefault(); release(k); })
       );
     });
-    window.addEventListener('keydown', e => {
-      const k = e.key.toLowerCase();
-      if (['w','a','s','d'].includes(k) && !held.has(k)) {
-        e.preventDefault(); hold(k);
-      }
-    });
-    window.addEventListener('keyup', e => {
-      const k = e.key.toLowerCase();
-      if (['w','a','s','d'].includes(k)) {
-        e.preventDefault(); release(k);
-      }
-    });
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (['w','a','s','d','t','f','h'].includes(k) && !held.has(k)) {
+    e.preventDefault();
+    hold(k);
+  }
+});
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (['w','a','s','d','t','f','h'].includes(k)) {
+    e.preventDefault();
+    release(k);
+  }
+});
+
 
     function hold(k) {
       const opp = opposites[k];
@@ -151,14 +169,14 @@
         const res = await fetch('/api/telemetry');
         const tele = await res.json();
         if (tele.bat_v != null) {
-          const pct = Math.min(Math.max((tele.bat_v - 5.5) / 2, 0), 1);
-          document.getElementById('bat-fill').style.width = `${(pct*100).toFixed(1)}%`;
-          document.getElementById('bat-status').textContent = `${(pct*100).toFixed(1)}%`;
+          const pct = Math.min(Math.max(tele.bat_v, 0), 100);
+          document.getElementById('bat-fill').style.width = `${(pct).toFixed(1)}%`;
+          document.getElementById('bat-status').textContent = `${(pct).toFixed(1)}%`;
         }
         if (tele.speed != null) {
-          const speed = tele.speed;
+          const speed = math.abs(tele.speed);
           document.getElementById('status').textContent = speed;
-          const spPct = Math.min(Math.max(speed / 300, 0), 1);
+          const spPct = Math.min(Math.max(speed / 65, 0), 1);
           document.getElementById('speed-fill').style.width = `${(spPct*100).toFixed(1)}%`;
         }
       } catch (e) {
